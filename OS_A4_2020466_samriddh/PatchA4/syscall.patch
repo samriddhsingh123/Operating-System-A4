@@ -1,0 +1,66 @@
+--- sys.c	2022-01-03 17:17:49.940238367 +0530
++++ sysfinal.c	2022-01-03 17:16:38.428000000 +0530
+@@ -264,6 +264,63 @@
+ 	return error;
+ }
+ 
++SYSCALL_DEFINE4(kernel_2d_memcpy,float __user *,src ,float __user *, dst,int, rows, int, cols){
++	int size = sizeof(float)*rows*cols;
++	float *ptr = (float *)kmalloc(size, GFP_KERNEL);
++	
++	if (__copy_from_user(ptr, src, size)) {
++		return -EFAULT;
++	}
++	if (__copy_to_user(dst, ptr, size)) {
++		return -EFAULT;
++	}
++	return 0;
++}
++struct Queues {
++        long list[50];
++        int start;
++		int end;
++} *queues;
++struct mutex lockS;
++SYSCALL_DEFINE1(writer,long ,value){
++	if (!queues) {
++                DEFINE_MUTEX(lockS);
++                queues = (struct Queues *) kmalloc(sizeof(struct Queues), GFP_KERNEL);
++                queues->start = 0;
++				queues->end = 0;
++
++                
++        }
++        
++        mutex_lock(&lockS);
++        
++        queues->list[queues->end] = value;
++        
++        queues->end=(queues->end+1)%50;
++        mutex_unlock(&lockS);
++        
++        return 0;
++}
++SYSCALL_DEFINE1(reader,long,value){
++	if (!queues) {
++                DEFINE_MUTEX(lockS);
++                queues = kmalloc(sizeof(struct Queues), GFP_KERNEL);
++                queues->end = 0;
++                queues->start = 0;
++        }
++        long temp;
++        
++        mutex_lock(&lockS);
++       
++        
++        temp = queues->list[queues->start];
++		queues->start=(queues->start+1)%50;
++        
++        mutex_unlock(&lockS);
++        
++        return temp;
++}
++
+ /*
+  * Ugh. To avoid negative return values, "getpriority()" will
+  * not return the normal nice-value, but a negated value that
